@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset=utf-8 />
+  <title>Lab 8: Denver home location exercise</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <!-- Is the is the latest version of Leaflet? -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: rgb(43, 43, 43);
+      font-family: "Lato", sans-serif;
+      font-size: 100%;
+      font-weight: 300;
+      color: rgb(172, 172, 172);
+    }
+
+    header,
+    footer,
+    section {
+      padding: 6px 10%;
+      margin: 0 auto;
+      width: 80%
+    }
+
+    h1 {
+      display: inline-block;
+      margin-right: 20px;
+      color: rgb(190, 190, 190);
+      font-size: 3.5em;
+      font-weight: 700;
+    }
+
+    h2 {
+      display: inline-block;
+      color: rgba(255, 200, 0, 0.8);
+      letter-spacing: 0.05em;
+      margin-top: 0px;
+      font-weight: 300;
+      text-transform: uppercase;
+      border-bottom: 1px dotted rgba(255, 200, 0, 0.5);
+      ;
+    }
+
+    #map {
+      width: 80%;
+      height: 540px;
+      margin: 10px auto;
+    }
+
+    p {
+      font-size: 1em;
+      color: rgba(170, 170, 170);
+      ;
+      font-weight: 300;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Denver, Colorado</h1>
+    <h2>Community Locations</h2>
+  </header>
+
+  <div id='map'></div>
+
+  <footer>
+    <p>Map authored by Michaella Mullins</p>
+    <p>Map of community centers, fire stations and grocery stores in Denver, Colorado.</p>
+  </footer>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+    integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+    integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+    crossorigin=""></script>
+  <script src='https://unpkg.com/simple-statistics@7.2.0/dist/simple-statistics.min.js'>
+  </script>
+
+<!-- Data -->
+<script src='data/uswtdb_v3_1_20200717.geojson'>
+</script>
+
+  <script>
+     var map = L.map('map', {
+      center: [39.7256, -104.9252],
+      zoom: 5,
+    });
+
+    var tiles = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/rastertiles/dark_all/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+
+var attributeValue = "p_name"
+var stateName ="t_state"
+ 
+
+
+ var countyLayer=$.getJSON("data/uswtdb_v3_1_20200717.geojson", function (data) {
+      var dataLayer = L.geoJson(data, {
+        style: function (feature) {
+          return {
+            color: '#dddddd',
+            weight: 1,
+            fillOpacity: 1,
+            fillColor: '#1f78b4'
+          };
+        }
+      }
+      ).addTo(map);
+      // empty array to hold all our values
+      drawMap(dataLayer);
+    }
+    );
+  
+    
+    function drawMap(dataLayer) {
+      var breaks = getClassBreaks(dataLayer);
+      dataLayer.eachLayer(function (layer) {
+        var props = layer.feature.properties;
+        layer.setStyle({
+          fillColor: getColor(props[attributeValue], breaks)
+        }
+        );
+      }
+      );
+     drawLegend(breaks) 
+    }
+
+    function getClassBreaks(dataLayer) {
+      // create empty Array for storing values
+      var values = [];
+      
+      // loop through all the counties
+      dataLayer.eachLayer(function (layer) {
+        var props = layer.feature.properties;
+        var value = props[attributeValue];
+        if(props[attributeValue]!==null){
+          var value =Number(props[attributeValue]);
+        }
+        else if(props[attributeValue]!==0){
+          return values;
+        }
+
+        values.push(value);
+
+         // Popup
+        layer.bindTooltip(`<b>${props[stateName]}</b>
+				<br><b>Average Rent: $</b>${props[attributeValue]} `
+        ).addTo(map);
+      }
+      );
+      // determine similar clusters
+      var clusters = ss.ckmeans(values, 6);
+      // create an array of the lowest value within each cluster
+      var breaks = clusters.map(function (cluster) {
+        return [cluster[0], cluster.pop()];
+        
+      }
+      );
+      return breaks; // return Array of class breaks
+    }
+      // create a new Leaflet control object, and position it top left
+    function getColor(d, breaks) {
+
+  if(d <= breaks[0][1]) {
+      return '#c1adea';
+  } else if(d <= breaks[1][1]) {
+      return '#b299e5';
+  } else if(d <= breaks[2][1]) {
+      return '#a284e0';
+  } else if(d <= breaks[3][1]) {
+      return '#9370db';
+  } else if(d <= breaks[4][1]) {
+      return '#845cd6';
+  } else if(d <= breaks[5][1]) {
+      return '#7447d1';
+  }
+  };
+ // end getColor
+
+  function drawLegend(breaks){
+
+    // create a new Leaflet control object, and position it top left
+    var legend = L.control({position: 'topleft'});
+    // when the legend is added to the map
+    legend.onAdd = function () {
+
+    // create a new HTML <div> element and give it a class name of "legend"
+    var div = L.DomUtil.create('div', 'legend');
+
+    // first append an <h3> tag to the div holding the current attribute
+    // and norm values (i.e., the mapped phenomena)
+    div.innerHTML = `<h3>Average Rental Price</h3>`;
+
+    // for each of our breaks
+    for (var i = 0; i < breaks.length; i++) {
+        // determine the color associated with each break value,
+        // including the lower range value
+        var color = getColor(breaks[i][0], breaks);
+
+        // concatenate a <span> tag styled with the color and the range values
+        // of that class and include a label with the low and a high ends of that class range
+        div.innerHTML +=
+            `<span style="background:${color}"></span>
+            <label>${(breaks[i][0]*1).toLocaleString()}&mdash;
+            ${(breaks[i][1]*1).toLocaleString()}</label>`;
+    }
+
+    // return the populated div to be added to the map
+    return div;
+};
+
+// add the legend to the map
+legend.addTo(map);
+}
+map.addControl( L.control.zoom({ position: 'topright' }));
+ 
+//  // Tell jQuery to wait until data is loaded before executing a function
+// $.when(countyLayer).done(function () {
+//   // load, filter, and style the state outline 
+//   $.getJSON("data/us_states_20m.geojson", function (data) {
+
+//       var stateLayer = L.geoJson(data, {
+//         style: function (feature) {
+//           return {
+//             // Let's experiment with these colors shortly
+//             //  color: '#222222', // Gray
+//             color: '#ffffff', // White
+//             // Make line weight larger than the county outline
+//             weight: 2,
+//             fillOpacity: 0,
+//             // This property allows us control interactivty of layer
+//             interactive: false
+//           };
+//         },
+
+//         // Filter for the correct state to use
+//         filter: function (feature) {
+//           if (feature.properties.NAME) {
+//             return feature;
+//           }
+//         }
+//       }
+//       );
+
+//       // Add layer to map!
+//       stateLayer.addTo(map)
+
+//   }
+//   );
+// }
+// );
+</script>
+</body>
+
+</html>
